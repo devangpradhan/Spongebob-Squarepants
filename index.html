@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>SpongeBob Interactive Scene</title>
+	<style>
+		:root {
+			--sand: #e3dbac;
+			--ink: #04223a;
+			--panel: rgba(255, 250, 214, 0.86);
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+			font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+			background: #67cbef;
+			color: var(--ink);
+			cursor: none;
+		}
+
+		.scene {
+			position: relative;
+			width: 100%;
+			height: 100%;
+			background-image: url("assets/backgorund.jpg");
+			background-size: cover;
+			background-position: center center;
+			display: grid;
+			place-items: end center;
+			isolation: isolate;
+		}
+
+		.bubble-layer {
+			position: absolute;
+			inset: 0;
+			overflow: hidden;
+			pointer-events: none;
+			z-index: 0;
+		}
+
+		.bubble {
+			position: absolute;
+			bottom: -80px;
+			border-radius: 50%;
+			background:
+				radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.16) 35%, rgba(145, 232, 255, 0.08) 64%, rgba(145, 232, 255, 0.03) 100%);
+			border: 1px solid rgba(214, 245, 255, 0.45);
+			box-shadow:
+				inset 0 0 8px rgba(255, 255, 255, 0.24),
+				0 0 12px rgba(194, 238, 255, 0.2);
+			opacity: 0;
+			animation: rise var(--dur, 9s) linear forwards;
+		}
+
+		@keyframes rise {
+			0% {
+				transform: translate3d(0, 0, 0) scale(0.72);
+				opacity: 0;
+			}
+			12% {
+				opacity: 0.62;
+			}
+			88% {
+				opacity: 0.52;
+			}
+			100% {
+				transform: translate3d(var(--drift, 0px), -108vh, 0) scale(1.12);
+				opacity: 0;
+			}
+		}
+
+		.character {
+			position: relative;
+			width: clamp(180px, 22vw, 320px);
+			margin-bottom: clamp(6px, 1.8vh, 18px);
+			filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.2));
+			isolation: isolate;
+			z-index: 2;
+		}
+
+		.character img {
+			display: block;
+			width: 100%;
+			user-select: none;
+			-webkit-user-drag: none;
+			pointer-events: none;
+			position: relative;
+			z-index: 1;
+		}
+
+		.eyes-rig {
+			position: absolute;
+			left: 18.4%;
+			top: 13.2%;
+			width: 63.2%;
+			aspect-ratio: 480 / 244;
+			opacity: 0.99;
+			z-index: 3;
+		}
+
+		.eye-layer {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+		}
+
+		#eyeShade {
+			opacity: 0.85;
+		}
+
+		#fishCursor {
+			position: fixed;
+			left: 0;
+			top: 0;
+			width: clamp(26px, 2.8vw, 42px);
+			transform: translate(-50%, -50%);
+			pointer-events: none;
+			z-index: 100;
+			filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.28));
+			transition: width 200ms ease;
+		}
+
+		@media (max-width: 700px) {
+			.character {
+				width: clamp(190px, 47vw, 260px);
+				margin-bottom: clamp(4px, 1.2vh, 12px);
+			}
+		}
+	</style>
+</head>
+<body>
+	<main class="scene" id="scene">
+		<div class="bubble-layer" id="bubbleLayer" aria-hidden="true"></div>
+		<figure class="character" aria-label="SpongeBob character with interactive eyes">
+			<img src="assets/body.png" alt="SpongeBob body" />
+			<div class="eyes-rig" id="eyesRig" aria-hidden="true">
+				<object class="eye-layer" id="eyeBg" type="image/svg+xml" data="assets/1_eye_bg.svg"></object>
+				<object class="eye-layer" id="eyeRight" type="image/svg+xml" data="assets/eb_r.svg"></object>
+				<object class="eye-layer" id="eyeLeft" type="image/svg+xml" data="assets/eb_l.svg"></object>
+				<object class="eye-layer" id="eyeShade" type="image/svg+xml" data="assets/2_eye_shade.svg"></object>
+			</div>
+		</figure>
+	</main>
+
+	<img id="fishCursor" src="assets/fish.png" alt="" aria-hidden="true" />
+
+	<script>
+		const scene = document.getElementById("scene");
+		const bubbleLayer = document.getElementById("bubbleLayer");
+		const fishCursor = document.getElementById("fishCursor");
+		const eyesRig = document.getElementById("eyesRig");
+		const eyeLeftObject = document.getElementById("eyeLeft");
+		const eyeRightObject = document.getElementById("eyeRight");
+
+		const EYE_VIEWBOX_WIDTH = 480;
+		const EYE_VIEWBOX_HEIGHT = 244;
+		const LEFT_CENTER = { x: 147, y: 107 };
+		const RIGHT_CENTER = { x: 334, y: 107 };
+		const MAX_OFFSET = 18;
+
+		let leftEyeballGroup = null;
+		let rightEyeballGroup = null;
+
+		let targetX = window.innerWidth * 0.5;
+		let targetY = window.innerHeight * 0.5;
+		let fishX = targetX;
+		let fishY = targetY;
+		let bubbleTimer = null;
+
+		function spawnBubble() {
+			if (!bubbleLayer) {
+				return;
+			}
+
+			if (bubbleLayer.childElementCount > 42) {
+				bubbleLayer.removeChild(bubbleLayer.firstElementChild);
+			}
+
+			const bubble = document.createElement("span");
+			bubble.className = "bubble";
+
+			const size = 8 + Math.random() * 26;
+			const left = Math.random() * 100;
+			const duration = 6.2 + Math.random() * 7.5;
+			const drift = (Math.random() * 120 - 60).toFixed(1);
+
+			bubble.style.width = `${size.toFixed(1)}px`;
+			bubble.style.height = `${size.toFixed(1)}px`;
+			bubble.style.left = `${left.toFixed(2)}%`;
+			bubble.style.setProperty("--dur", `${duration.toFixed(2)}s`);
+			bubble.style.setProperty("--drift", `${drift}px`);
+
+			bubble.addEventListener("animationend", () => bubble.remove(), { once: true });
+			bubbleLayer.appendChild(bubble);
+		}
+
+		function startBubbleStream() {
+			for (let i = 0; i < 14; i += 1) {
+				setTimeout(spawnBubble, i * 180);
+			}
+
+			bubbleTimer = window.setInterval(() => {
+				const burst = Math.random() < 0.23 ? 2 : 1;
+				for (let i = 0; i < burst; i += 1) {
+					spawnBubble();
+				}
+			}, 360);
+		}
+
+		function clampOffset(dx, dy, maxDistance) {
+			const distance = Math.hypot(dx, dy);
+			if (distance <= maxDistance || distance === 0) {
+				return { x: dx, y: dy };
+			}
+
+			const ratio = maxDistance / distance;
+			return { x: dx * ratio, y: dy * ratio };
+		}
+
+		function mapPointerToSvg(clientX, clientY) {
+			const rect = eyesRig.getBoundingClientRect();
+			if (!rect.width || !rect.height) {
+				return { x: EYE_VIEWBOX_WIDTH * 0.5, y: EYE_VIEWBOX_HEIGHT * 0.5 };
+			}
+
+			const x = ((clientX - rect.left) / rect.width) * EYE_VIEWBOX_WIDTH;
+			const y = ((clientY - rect.top) / rect.height) * EYE_VIEWBOX_HEIGHT;
+			return { x, y };
+		}
+
+		function moveEyeballs(clientX, clientY) {
+			if (!leftEyeballGroup || !rightEyeballGroup) {
+				return;
+			}
+
+			const pointer = mapPointerToSvg(clientX, clientY);
+
+			const leftOffset = clampOffset(pointer.x - LEFT_CENTER.x, pointer.y - LEFT_CENTER.y, MAX_OFFSET);
+			const rightOffset = clampOffset(pointer.x - RIGHT_CENTER.x, pointer.y - RIGHT_CENTER.y, MAX_OFFSET);
+
+			rightEyeballGroup.setAttribute("transform", `translate(${rightOffset.x.toFixed(2)} ${rightOffset.y.toFixed(2)})`);
+			leftEyeballGroup.setAttribute("transform", `translate(${leftOffset.x.toFixed(2)} ${leftOffset.y.toFixed(2)})`);
+		}
+
+		function animateFishCursor() {
+			fishX += (targetX - fishX) * 0.22;
+			fishY += (targetY - fishY) * 0.22;
+
+			fishCursor.style.left = `${fishX}px`;
+			fishCursor.style.top = `${fishY}px`;
+
+			requestAnimationFrame(animateFishCursor);
+		}
+
+		function onPointerMove(event) {
+			targetX = event.clientX;
+			targetY = event.clientY;
+			moveEyeballs(event.clientX, event.clientY);
+		}
+
+		function onTouchMove(event) {
+			const touch = event.touches[0];
+			if (!touch) {
+				return;
+			}
+
+			targetX = touch.clientX;
+			targetY = touch.clientY;
+			moveEyeballs(touch.clientX, touch.clientY);
+		}
+
+		function setupEyeLayer() {
+			const leftDoc = eyeLeftObject.contentDocument;
+			const rightDoc = eyeRightObject.contentDocument;
+
+			if (!leftDoc || !rightDoc) {
+				return;
+			}
+
+			leftEyeballGroup = leftDoc.getElementById("Eye_Ball_Left");
+			rightEyeballGroup = rightDoc.getElementById("Eye_Ball_Right");
+
+			moveEyeballs(window.innerWidth * 0.5, window.innerHeight * 0.5);
+		}
+
+		eyeLeftObject.addEventListener("load", setupEyeLayer);
+		eyeRightObject.addEventListener("load", setupEyeLayer);
+		setupEyeLayer();
+
+		scene.addEventListener("pointermove", onPointerMove);
+		scene.addEventListener("touchmove", onTouchMove, { passive: true });
+
+		window.addEventListener("resize", () => {
+			moveEyeballs(targetX, targetY);
+		});
+
+		startBubbleStream();
+		animateFishCursor();
+	</script>
+</body>
+</html>
