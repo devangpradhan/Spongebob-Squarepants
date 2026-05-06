@@ -124,7 +124,7 @@
 			position: fixed;
 			left: 0;
 			top: 0;
-			width: clamp(26px, 2.8vw, 42px);
+			width: clamp(26px, 2.8vw, 100px);
 			transform: translate(-50%, -50%);
 			pointer-events: none;
 			z-index: 100;
@@ -168,7 +168,7 @@
 		const EYE_VIEWBOX_HEIGHT = 244;
 		const LEFT_CENTER = { x: 147, y: 107 };
 		const RIGHT_CENTER = { x: 334, y: 107 };
-		const MAX_OFFSET = 18;
+		const MAX_OFFSET = 45;
 
 		let leftEyeballGroup = null;
 		let rightEyeballGroup = null;
@@ -221,12 +221,28 @@
 
 		function clampOffset(dx, dy, maxDistance) {
 			const distance = Math.hypot(dx, dy);
-			if (distance <= maxDistance || distance === 0) {
-				return { x: dx, y: dy };
+			if (distance === 0) {
+				return { x: 0, y: 0 };
 			}
 
-			const ratio = maxDistance / distance;
-			return { x: dx * ratio, y: dy * ratio };
+			const deadZone = 14;
+			if (distance <= deadZone) {
+				return { x: 0, y: 0 };
+			}
+
+			const directionX = dx / distance;
+			const directionY = dy / distance;
+
+			const activeDistance = distance - deadZone;
+			const curveRange = maxDistance * 1.9;
+			const normalized = Math.min(1, activeDistance / curveRange);
+			const eased = Math.pow(normalized, 1.35);
+			const finalDistance = eased * maxDistance;
+
+			return {
+				x: directionX * finalDistance,
+				y: directionY * finalDistance
+			};
 		}
 
 		function mapPointerToSvg(clientX, clientY) {
