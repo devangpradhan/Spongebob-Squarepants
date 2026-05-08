@@ -1,5 +1,7 @@
 # 🧽 SpongeBob SquarePants — Interactive Scene
 
+![alt text](assets/Screenshot.gif)
+
 A creative, interactive browser scene built with **HTML**, **CSS**, and **vanilla JavaScript** featuring SpongeBob SquarePants standing in front of his pineapple house in Bikini Bottom.
 
 ---
