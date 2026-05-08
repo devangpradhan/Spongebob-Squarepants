@@ -60,6 +60,7 @@
 				0 0 12px rgba(194, 238, 255, 0.2);
 			opacity: 0;
 			animation: rise var(--dur, 9s) linear forwards;
+			pointer-events: none;
 		}
 
 		@keyframes rise {
@@ -124,7 +125,7 @@
 			position: fixed;
 			left: 0;
 			top: 0;
-			width: clamp(26px, 2.8vw, 100px);
+			width: clamp(26px, 5.8vw, 200px);
 			transform: translate(-50%, -50%);
 			pointer-events: none;
 			z-index: 100;
@@ -179,26 +180,45 @@
 		let fishY = targetY;
 		let bubbleTimer = null;
 
-		function spawnBubble() {
+		function spawnBubble(x = null, y = null) {
 			if (!bubbleLayer) {
 				return;
 			}
 
-			if (bubbleLayer.childElementCount > 42) {
+			if (bubbleLayer.childElementCount > 62) {
 				bubbleLayer.removeChild(bubbleLayer.firstElementChild);
 			}
 
 			const bubble = document.createElement("span");
 			bubble.className = "bubble";
 
-			const size = 8 + Math.random() * 26;
-			const left = Math.random() * 100;
-			const duration = 6.2 + Math.random() * 7.5;
-			const drift = (Math.random() * 120 - 60).toFixed(1);
+			const size = 6 + Math.random() * 18;
+			const duration = 5.2 + Math.random() * 6.5;
+			const drift = (Math.random() * 100 - 50).toFixed(1);
+
+			// If x, y provided (cursor position), spawn from cursor; otherwise random bottom
+			let left, top;
+			if (x !== null && y !== null) {
+				left = x;
+				top = y;
+				bubble.style.position = "fixed";
+			} else {
+				left = Math.random() * 100;
+				top = "auto";
+				bubble.style.position = "absolute";
+			}
 
 			bubble.style.width = `${size.toFixed(1)}px`;
 			bubble.style.height = `${size.toFixed(1)}px`;
-			bubble.style.left = `${left.toFixed(2)}%`;
+			
+			if (bubble.style.position === "fixed") {
+				bubble.style.left = `${left.toFixed(0)}px`;
+				bubble.style.top = `${top.toFixed(0)}px`;
+			} else {
+				bubble.style.left = `${left.toFixed(2)}%`;
+				bubble.style.bottom = "-80px";
+			}
+			
 			bubble.style.setProperty("--dur", `${duration.toFixed(2)}s`);
 			bubble.style.setProperty("--drift", `${drift}px`);
 
@@ -217,6 +237,14 @@
 					spawnBubble();
 				}
 			}, 360);
+		}
+
+		function spawnCursorBubbles() {
+			// Spawn bubbles from fish cursor position
+			if (Math.random() < 0.68) {
+				spawnBubble(fishX, fishY);
+			}
+			requestAnimationFrame(spawnCursorBubbles);
 		}
 
 		function clampOffset(dx, dy, maxDistance) {
@@ -324,6 +352,7 @@
 
 		startBubbleStream();
 		animateFishCursor();
+		spawnCursorBubbles();
 	</script>
 </body>
 </html>
